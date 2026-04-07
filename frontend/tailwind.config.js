@@ -13,6 +13,13 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+        'sniper-bg': '#05070A',
+        'sniper-surface': '#111622',
+        'sniper-surface2': '#1A2235',
+        'sniper-green': '#00FF41',
+        'sniper-red': '#FF3B30',
+        'sniper-amber': '#FFB020',
+        'sniper-blue': '#4299E1',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
