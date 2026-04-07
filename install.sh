@@ -60,19 +60,20 @@ SQLITE_DB="sniperai.db"
 SNIPER_INSTALL_DIR="/usr/share/sniper"
 SNIPER_LOOT_DIR="/usr/share/sniper/loot"
 
-# ── Configuración AI ──
-# Pon tu API key de OpenAI aqui:
+# ── Kimi AI (Moonshot) — endpoint INTERNACIONAL ──
 AI_PROVIDER="openai"
 AI_API_KEY=""
-AI_MODEL="gpt-4o"
-# Para Anthropic Claude:
-# AI_API_KEY="sk-ant-..."
-# AI_MODEL="claude-3-5-sonnet-20241022"
+AI_MODEL="kimi-k2.5"
+AI_BASE_URL="https://api.moonshot.ai/v1"
+
+# Para usar OpenAI en su lugar:
+# AI_API_KEY="sk-..."
+# AI_MODEL="gpt-4o"
+# AI_BASE_URL=""
 EOF
     echo ""
-    echo -e "${RED}IMPORTANTE: Edita backend/.env y agrega tu AI_API_KEY${NC}"
-    echo -e "  OpenAI:    https://platform.openai.com/api-keys"
-    echo -e "  Anthropic: https://console.anthropic.com/settings/keys"
+    echo -e "${YELLOW}IMPORTANTE: Edita backend/.env y pon tu AI_API_KEY de Kimi${NC}"
+    echo -e "  Obtener key: ${GREEN}https://platform.moonshot.ai${NC} → API Keys"
     echo ""
 fi
 
