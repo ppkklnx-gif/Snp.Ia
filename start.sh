@@ -53,24 +53,23 @@ sleep 2
 
 # ── Frontend (si node está disponible) ──
 if command -v node &> /dev/null && [ -d "frontend" ]; then
-    echo -e "${YELLOW}[*] Frontend en http://localhost:${FRONTEND_PORT}${NC}"
+
+    # Detectar IP local automáticamente
+    LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    [ -z "$LOCAL_IP" ] && LOCAL_IP=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
+    [ -z "$LOCAL_IP" ] && LOCAL_IP="localhost"
+
+    echo -e "${GREEN}[+] IP local: ${LOCAL_IP}${NC}"
+    echo -e "${YELLOW}[*] Frontend en http://${LOCAL_IP}:${FRONTEND_PORT}${NC}"
     cd frontend
 
-    # Configurar .env local
-    if [ ! -f ".env" ]; then
-        cat > .env << EOF
-REACT_APP_BACKEND_URL=http://localhost:${BACKEND_PORT}
+    # Siempre reescribir .env con la IP real para acceso desde red local
+    cat > .env << EOF
+REACT_APP_BACKEND_URL=http://${LOCAL_IP}:${BACKEND_PORT}
 WDS_SOCKET_PORT=443
 PORT=${FRONTEND_PORT}
+HOST=0.0.0.0
 EOF
-    else
-        # Asegurar puerto correcto aunque ya exista el .env
-        grep -q "^PORT=" .env \
-            && sed -i "s/^PORT=.*/PORT=${FRONTEND_PORT}/" .env \
-            || echo "PORT=${FRONTEND_PORT}" >> .env
-        grep -q "^REACT_APP_BACKEND_URL=" .env \
-            || echo "REACT_APP_BACKEND_URL=http://localhost:${BACKEND_PORT}" >> .env
-    fi
 
     if command -v yarn &> /dev/null; then
         yarn start &
@@ -94,9 +93,10 @@ echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  SniperAI COMMAND CENTER ONLINE${NC}"
 echo -e "${GREEN}========================================${NC}"
-echo -e "  Dashboard:  ${YELLOW}http://localhost:${FRONTEND_PORT}${NC}"
-echo -e "  API:        http://localhost:${BACKEND_PORT}/api/"
-echo -e "  Sn1per:     ${SNIPER_STATUS}"
+echo -e "  Esta máquina:  ${YELLOW}http://localhost:${FRONTEND_PORT}${NC}"
+echo -e "  Red local:     ${YELLOW}http://${LOCAL_IP}:${FRONTEND_PORT}${NC}  ← celular/otra PC"
+echo -e "  API:           http://${LOCAL_IP}:${BACKEND_PORT}/api/"
+echo -e "  Sn1per:        ${SNIPER_STATUS}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
