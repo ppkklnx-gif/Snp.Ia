@@ -15,6 +15,14 @@ const MODES = [
   { value: "airstrike", label: "AIRSTRIKE", desc: "Quick ports + fingerprinting on multiple hosts" },
 ];
 
+// Limpia el target: quita http://, https://, espacios y slash final
+function cleanTarget(raw) {
+  return raw.trim()
+    .replace(/^https?:\/\//i, "")   // quita http:// o https://
+    .replace(/\/+$/, "")             // quita slash al final
+    .split("/")[0];                  // solo el hostname (sin path)
+}
+
 export default function NewScan() {
   const navigate = useNavigate();
   const [target, setTarget] = useState("");
@@ -30,39 +38,44 @@ export default function NewScan() {
     if (!target.trim()) return;
     setRecLoading(true);
     setRecommendation(null);
+    setError("");
+    const cleaned = cleanTarget(target);
     try {
       const res = await fetch(`${API}/ai/recommend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: target.trim() })
+        body: JSON.stringify({ target: cleaned })
       });
       const data = await res.json();
       setRecommendation(data);
-      // Auto-apply recommendation
       if (data.recommended_mode) setMode(data.recommended_mode);
       if (data.recommended_options) setOptions(data.recommended_options);
     } catch (e) {
-      setError("AI recommendation failed");
+      setError("Error conectando con el servidor AI. Verifica que el backend está corriendo.");
     }
     setRecLoading(false);
   };
 
   const launchScan = async () => {
-    if (!target.trim()) { setError("Target is required"); return; }
+    if (!target.trim()) { setError("Debes ingresar un objetivo"); return; }
     setLaunching(true);
     setError("");
+    const cleaned = cleanTarget(target);
+    const ws = workspace.trim() || cleaned.replace(/[^a-zA-Z0-9_-]/g, "_");
     try {
-      const ws = workspace.trim() || target.replace(/[^a-zA-Z0-9_-]/g, "_");
       const res = await fetch(`${API}/scans`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: target.trim(), mode, workspace: ws, options })
+        body: JSON.stringify({ target: cleaned, mode, workspace: ws, options })
       });
-      if (!res.ok) throw new Error("Failed to create scan");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Error del servidor (${res.status})`);
+      }
       const scan = await res.json();
       navigate(`/scan/${scan.id}`);
     } catch (e) {
-      setError(e.message);
+      setError(e.message.includes("fetch") ? "No se puede conectar al backend. ¿Está corriendo en puerto 8001?" : e.message);
       setLaunching(false);
     }
   };
@@ -86,10 +99,17 @@ export default function NewScan() {
             <label className="section-label" style={{ display: "block", marginBottom: 8 }}>Target</label>
             <input className="input-dark" data-testid="target-input"
               value={target} onChange={e => setTarget(e.target.value)}
-              placeholder="192.168.1.1 | example.com | 10.0.0.0/24"
+              placeholder="192.168.1.1 | finsq.ens.uabc.mx | 10.0.0.0/24"
               onKeyDown={e => e.key === "Enter" && getRecommendation()}
               style={{ fontSize: 14 }} />
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>IP address, domain, URL, or CIDR range</div>
+            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+              IP, dominio o CIDR — el https:// se quita automáticamente
+              {target && cleanTarget(target) !== target.trim() && (
+                <span style={{ color: "#00FF41", marginLeft: 8 }}>
+                  → se usará: <strong>{cleanTarget(target)}</strong>
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Mode */}
@@ -178,7 +198,7 @@ export default function NewScan() {
             <div style={{ textAlign: "center", padding: "48px 24px" }}>
               <Zap size={32} color="#1A2235" style={{ margin: "0 auto 12px" }} />
               <div style={{ fontSize: 12, color: "#94A3B8", fontFamily: "JetBrains Mono" }}>
-                Enter a target and click AI RECOMMEND to get an intelligent attack strategy powered by Kimi AI.
+                Ingresa un objetivo y haz click en AI RECOMMEND para obtener una estrategia de ataque inteligente.
               </div>
             </div>
           )}

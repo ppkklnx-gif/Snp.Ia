@@ -470,24 +470,27 @@ async def get_stats():
 @api_router.post("/scans")
 async def create_scan(scan_in: ScanCreate, background_tasks: BackgroundTasks):
     scan_id = str(uuid.uuid4())
-    workspace = scan_in.workspace.strip() or scan_in.target.replace(".", "_").replace("/", "_")
+    # Limpiar target: quitar https://, http://, slashes finales
+    import re as _re
+    target = _re.sub(r'^https?://', '', scan_in.target.strip()).rstrip('/')
+    workspace = scan_in.workspace.strip() or target.replace(".", "_").replace("/", "_")
 
     db = await get_db()
     await db.execute(
         "INSERT INTO scans (id, target, mode, workspace, status, options, created_at, log_file) VALUES (?,?,?,?,?,?,?,?)",
-        (scan_id, scan_in.target, scan_in.mode, workspace, "pending",
+        (scan_id, target, scan_in.mode, workspace, "pending",
          json.dumps(scan_in.options), now_iso(), f"{LOG_DIR}/{scan_id}.log")
     )
     await db.commit()
     await db.close()
 
-    scan_doc = {"id": scan_id, "target": scan_in.target, "mode": scan_in.mode,
+    scan_doc = {"id": scan_id, "target": target, "mode": scan_in.mode,
                 "workspace": workspace, "options": scan_in.options}
 
     if is_sniper_available():
         background_tasks.add_task(run_real_scan, scan_id, scan_doc)
     else:
-        background_tasks.add_task(run_demo_scan, scan_id, scan_in.target, workspace)
+        background_tasks.add_task(run_demo_scan, scan_id, target, workspace)
 
     return {**scan_doc, "status": "pending", "demo": not is_sniper_available()}
 
