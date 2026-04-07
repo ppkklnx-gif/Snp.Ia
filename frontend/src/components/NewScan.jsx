@@ -4,15 +4,14 @@ import { API } from "../App";
 import { Zap, Target, ChevronRight, Loader, AlertTriangle, Check } from "lucide-react";
 
 const MODES = [
-  { value: "normal", label: "NORMAL", desc: "Standard scan: DNS, ports, per-service nmap+MSF" },
-  { value: "stealth", label: "STEALTH", desc: "Non-intrusive, avoids WAF/IPS detection" },
-  { value: "web", label: "WEB", desc: "Full web app scan: nikto, dirb, HTTP headers, SSL" },
-  { value: "webscan", label: "WEBSCAN", desc: "Advanced: Burpsuite + Arachni + OWASP ZAP" },
-  { value: "fullportonly", label: "FULLPORT", desc: "Complete port scan 1-65535 with XML output" },
-  { value: "vulnscan", label: "VULNSCAN", desc: "OpenVAS/GVM CVE assessment with CVSS scoring" },
-  { value: "nuke", label: "NUKE", desc: "FULL audit: all options, MSF exploits, bruteforce" },
-  { value: "discover", label: "DISCOVER", desc: "CIDR subnet scan - maps all live hosts" },
-  { value: "airstrike", label: "AIRSTRIKE", desc: "Quick ports + fingerprinting on multiple hosts" },
+  { value: "normal", label: "NORMAL", desc: "Scan completo + Metasploit por puerto + exploits automáticos" },
+  { value: "stealth", label: "STEALTH", desc: "No-intrusivo, evita WAF/IPS. Sin MSF." },
+  { value: "web", label: "WEB", desc: "Web app scan: nikto, dirb, headers, SSL, SQLi, XSS" },
+  { value: "webscan", label: "WEBSCAN", desc: "Avanzado: Burpsuite + Arachni + OWASP ZAP" },
+  { value: "fullportonly", label: "FULLPORT", desc: "Scan completo 1-65535 con XML output" },
+  { value: "nuke", label: "NUKE", desc: "FULL: todos los exploits MSF + bruteforce + OSINT" },
+  { value: "discover", label: "DISCOVER", desc: "Subnet/CIDR — mapea todos los hosts vivos" },
+  { value: "airstrike", label: "AIRSTRIKE", desc: "Ports + fingerprint rápido en múltiples hosts" },
 ];
 
 // Limpia el target: quita http://, https://, espacios y slash final
@@ -29,6 +28,8 @@ export default function NewScan() {
   const [mode, setMode] = useState("normal");
   const [workspace, setWorkspace] = useState("");
   const [options, setOptions] = useState({ osint: false, recon: false, bruteforce: false, full_port: false });
+  const [lhost, setLhost] = useState("");
+  const [lport, setLport] = useState("4444");
   const [recommendation, setRecommendation] = useState(null);
   const [recLoading, setRecLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
@@ -66,7 +67,8 @@ export default function NewScan() {
       const res = await fetch(`${API}/scans`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: cleaned, mode, workspace: ws, options })
+        body: JSON.stringify({ target: cleaned, mode, workspace: ws, options,
+          lhost: lhost.trim() || "0.0.0.0", lport: parseInt(lport) || 4444 })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -156,6 +158,24 @@ export default function NewScan() {
                   <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>{opt.desc}</div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* LHOST/LPORT para payloads reversos */}
+          <div>
+            <label className="section-label" style={{ display: "block", marginBottom: 8 }}>
+              LHOST / LPORT <span style={{ color: "#94A3B8", fontSize: 9, fontWeight: 400 }}>(para shells reversos de Metasploit)</span>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "3fr 1fr", gap: 8 }}>
+              <input className="input-dark" data-testid="lhost-input"
+                value={lhost} onChange={e => setLhost(e.target.value)}
+                placeholder="Tu IP local (ej: 192.168.1.50)" style={{ fontSize: 13 }} />
+              <input className="input-dark" data-testid="lport-input"
+                value={lport} onChange={e => setLport(e.target.value)}
+                placeholder="4444" style={{ fontSize: 13 }} />
+            </div>
+            <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 3 }}>
+              Necesario si usas modos con exploits MSF (NORMAL, NUKE). Deja en blanco si solo haces recon.
             </div>
           </div>
 

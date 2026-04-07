@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from ai_engine import analyze_scan_results, get_mode_recommendation, chat_with_ai
+from sniper_conf import build_exploit_conf, msf_available, nmap_available
 from loot_parser import collect_loot_summary, extract_findings_from_nmap, list_workspaces, get_workspace_dir
 from database import get_db, init_db, row_to_dict
 
@@ -45,6 +46,8 @@ class ScanCreate(BaseModel):
     mode: str = "normal"
     workspace: str = ""
     options: Dict[str, bool] = {}
+    lhost: str = "0.0.0.0"   # IP local para payloads reversos de Metasploit
+    lport: int = 4444          # Puerto local para listener
 
 
 class ChatMessage(BaseModel):
@@ -204,13 +207,22 @@ def get_sniper_cmd() -> str:
     return "sniper"
 
 
-def build_sniper_command(scan: dict) -> list:
+def build_sniper_command(scan: dict, lhost: str = "0.0.0.0", lport: int = 4444) -> list:
     options = scan.get("options", {})
     if isinstance(options, str):
         options = json.loads(options)
-    # sudo requerido para que sniper pueda ejecutar nmap, metasploit, etc.
+    mode = scan.get("mode", "normal")
     sniper = get_sniper_cmd()
-    cmd = ["sudo", sniper, "-t", scan["target"], "-m", scan.get("mode", "normal"), "-w", scan.get("workspace", "default")]
+
+    # Generar conf con Metasploit exploitation activado (excepto stealth)
+    if mode != "stealth" and is_sniper_available():
+        conf_path = build_exploit_conf(lhost=lhost, lport=lport)
+        cmd = ["sudo", sniper, "-c", conf_path,
+               "-t", scan["target"], "-m", mode, "-w", scan.get("workspace", "default")]
+    else:
+        cmd = ["sudo", sniper,
+               "-t", scan["target"], "-m", mode, "-w", scan.get("workspace", "default")]
+
     if options.get("osint"):      cmd.append("-o")
     if options.get("recon"):      cmd.append("-re")
     if options.get("bruteforce"): cmd.append("-b")
@@ -238,7 +250,9 @@ async def insert_finding(scan_id: str, workspace: str, host: str, f: dict):
 
 async def run_real_scan(scan_id: str, scan_doc: dict):
     log_file = f"{LOG_DIR}/{scan_id}.log"
-    cmd = build_sniper_command(scan_doc)
+    cmd = build_sniper_command(scan_doc,
+                               lhost=scan_doc.get("lhost", "0.0.0.0"),
+                               lport=scan_doc.get("lport", 4444))
     mode = scan_doc.get("mode", "normal")
     target = scan_doc.get("target", "")
 
@@ -562,6 +576,8 @@ async def get_stats():
         "total_findings": total_findings, "critical_findings": critical_findings,
         "attack_plans": attack_plans, "chain_runs": chain_runs,
         "sniper_available": is_sniper_available(),
+        "msf_available": msf_available(),
+        "nmap_available": nmap_available(),
     }
 
 
@@ -583,7 +599,8 @@ async def create_scan(scan_in: ScanCreate, background_tasks: BackgroundTasks):
     await db.close()
 
     scan_doc = {"id": scan_id, "target": target, "mode": scan_in.mode,
-                "workspace": workspace, "options": scan_in.options}
+                "workspace": workspace, "options": scan_in.options,
+                "lhost": scan_in.lhost, "lport": scan_in.lport}
 
     if is_sniper_available():
         background_tasks.add_task(run_real_scan, scan_id, scan_doc)
