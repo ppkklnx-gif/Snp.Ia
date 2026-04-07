@@ -16,18 +16,28 @@ AI_API_KEY  = os.environ.get("AI_API_KEY") or os.environ.get("OPENAI_API_KEY", "
 AI_MODEL    = os.environ.get("AI_MODEL", "gpt-4o")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", None)
 
-# Intenta cargar emergentintegrations (disponible en Emergent cloud)
-try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", AI_API_KEY)
-    USE_EMERGENT = bool(EMERGENT_KEY)
-    logger.info("emergentintegrations disponible — modo Emergent cloud")
-except ImportError:
-    USE_EMERGENT = False
-    logger.info("emergentintegrations no encontrado — usando openai SDK estándar")
+# ── Lógica de backend AI ──
+# Si hay AI_BASE_URL (= Kimi u otro proveedor externo) → SIEMPRE openai SDK directo
+# Si NO hay AI_BASE_URL → intentar emergentintegrations (Emergent cloud)
+USE_EMERGENT = False
 
-if not USE_EMERGENT:
+if AI_BASE_URL:
+    # Kimi u otro proveedor con endpoint personalizado → nunca usar emergentintegrations
     from openai import AsyncOpenAI
+    logger.info(f"Kimi/custom: openai SDK → {AI_BASE_URL} modelo={AI_MODEL}")
+else:
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+        if EMERGENT_KEY:
+            USE_EMERGENT = True
+            logger.info("Emergent cloud: usando emergentintegrations")
+        else:
+            from openai import AsyncOpenAI
+            logger.info("openai SDK directo (sin EMERGENT_LLM_KEY)")
+    except ImportError:
+        from openai import AsyncOpenAI
+        logger.info("openai SDK directo (emergentintegrations no instalado)")
 
 # ──────────────────────────────────────────────
 SNIPER_SYSTEM = """You are SniperAI, an elite offensive security AI for the Sn1per Attack Surface Management Platform v9.2.
@@ -95,13 +105,15 @@ async def _ask_openai(prompt: str) -> str:
     if AI_BASE_URL:
         kwargs["base_url"] = AI_BASE_URL
     client = AsyncOpenAI(**kwargs)
+    # kimi-k2.5 solo acepta temperature=1; otros modelos admiten variaciones
+    temp = 1 if "kimi" in AI_MODEL.lower() or "moonshot" in AI_MODEL.lower() else 0.3
     resp = await client.chat.completions.create(
         model=AI_MODEL,
         messages=[
             {"role": "system", "content": SNIPER_SYSTEM},
             {"role": "user",   "content": prompt},
         ],
-        temperature=0.3,
+        temperature=temp,
         max_tokens=8000,
     )
     return resp.choices[0].message.content
@@ -128,7 +140,10 @@ Return ONLY valid JSON attack plan."""
         raw = await _ask(prompt, f"analyze-{uuid.uuid4()}")
         return json.loads(_clean(raw))
     except Exception as e:
-        logger.error(f"AI analyze error: {e}")
+        err = str(e)
+        logger.error(f"AI analyze error: {err}")
+        if "401" in err or "Incorrect API key" in err or "Authentication" in err:
+            return _key_error_plan(scan_data)
         return _fallback_plan(scan_data)
 
 
@@ -160,7 +175,45 @@ async def chat_with_ai(message: str, scan_context: str = "", history: list = [])
     try:
         return await _ask(message, f"chat-{uuid.uuid4()}")
     except Exception as e:
-        return f"AI error: {str(e)}"
+        err = str(e)
+        if "401" in err or "Incorrect API key" in err or "Authentication" in err:
+            return "SIN CREDITOS AI: Ve a Profile → Universal Key → Add Balance en Emergent, o configura AI_API_KEY en backend/.env con tu key de Kimi/OpenAI."
+        return f"AI error: {err[:200]}"
+
+
+def _key_error_plan(scan_data: dict) -> dict:
+    t = scan_data.get("target", "target")
+    w = scan_data.get("workspace", "default")
+    return {
+        "executive_summary": f"CREDITOS AI AGOTADOS — Recarga el balance de tu Universal Key en Emergent (Profile → Universal Key → Add Balance). Los hallazgos del scan siguen disponibles abajo.",
+        "risk_level": "HIGH",
+        "target_profile": f"Target: {t} — scan completado exitosamente",
+        "key_findings": [
+            "Scan ejecutado correctamente — hallazgos disponibles en panel de findings",
+            "Para análisis IA: recarga balance en Emergent o configura tu key de Kimi en backend/.env"
+        ],
+        "attack_phases": [
+            {
+                "phase_number": 1, "phase_name": "Web Application Deep Scan",
+                "priority": "HIGH",
+                "rationale": "Puertos web detectados — escaneo web profundo recomendado",
+                "findings": ["Puertos HTTP/HTTPS abiertos"],
+                "commands": [f"sniper -t {t} -m web -w {w}", f"sniper -t {t} -m webscan -w {w}"],
+                "expected_outcome": "Enumeración completa de vulnerabilidades web"
+            },
+            {
+                "phase_number": 2, "phase_name": "Full Port Scan",
+                "priority": "MEDIUM",
+                "rationale": "Identificar todos los servicios expuestos",
+                "findings": ["Posibles puertos ocultos"],
+                "commands": [f"sniper -t {t} -m fullportonly -w {w}"],
+                "expected_outcome": "Mapa completo de superficie de ataque"
+            }
+        ],
+        "immediate_next_command": f"sniper -t {t} -m web -o -w {w}",
+        "cve_findings": [],
+        "remediation_summary": "Revisar los hallazgos del scan manualmente en el panel de findings."
+    }
 
 
 def _fallback_plan(scan_data: dict) -> dict:
