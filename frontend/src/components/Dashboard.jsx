@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API } from "../App";
-import { Activity, ShieldAlert, Zap, Target, ChevronRight, Clock, AlertTriangle } from "lucide-react";
+import { Activity, ShieldAlert, Zap, Target, ChevronRight, Clock, AlertTriangle, Trash2 } from "lucide-react";
 
 function StatCard({ label, value, color, icon: Icon }) {
   return (
@@ -45,10 +45,21 @@ export default function Dashboard({ stats }) {
   const [scans, setScans] = useState([]);
   const [findings, setFindings] = useState([]);
 
+  const loadScans = () => fetch(`${API}/scans`).then(r => r.json()).then(data => setScans(data.slice(0, 10))).catch(() => {});
+
   useEffect(() => {
-    fetch(`${API}/scans`).then(r => r.json()).then(data => setScans(data.slice(0, 8))).catch(() => {});
+    loadScans();
     fetch(`${API}/findings?limit=8`).then(r => r.json()).then(setFindings).catch(() => {});
+    const interval = setInterval(loadScans, 8000);
+    return () => clearInterval(interval);
   }, []);
+
+  const deleteScan = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm("¿Eliminar este scan y todos sus datos?")) return;
+    await fetch(`${API}/scans/${id}`, { method: "DELETE" });
+    loadScans();
+  };
 
   return (
     <div style={{ padding: "24px", minHeight: "100vh" }}>
@@ -105,6 +116,15 @@ export default function Dashboard({ stats }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <StatusBadge status={s.status} />
+                  <button
+                    data-testid={`delete-scan-${i}`}
+                    onClick={(e) => deleteScan(e, s.id)}
+                    title="Eliminar scan"
+                    style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: "#94A3B8", display: "flex", alignItems: "center", transition: "color 150ms" }}
+                    onMouseEnter={e => e.currentTarget.style.color = "#FF3B30"}
+                    onMouseLeave={e => e.currentTarget.style.color = "#94A3B8"}>
+                    <Trash2 size={13} />
+                  </button>
                   <ChevronRight size={12} color="#94A3B8" />
                 </div>
               </div>

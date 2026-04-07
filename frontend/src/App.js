@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import "./index.css";
 import Dashboard from "./components/Dashboard";
@@ -9,7 +9,7 @@ import Results from "./components/Results";
 import Workspaces from "./components/Workspaces";
 import {
   LayoutDashboard, PlusCircle, Terminal, ShieldAlert,
-  FolderOpen, Database, Zap, Activity, ChevronRight
+  FolderOpen, Activity, Bell
 } from "lucide-react";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -21,7 +21,53 @@ const NAV_ITEMS = [
   { path: "/findings", icon: ShieldAlert, label: "All Findings" },
 ];
 
-function Sidebar({ stats }) {
+// ── Monitor global de scans activos ──
+function useGlobalScanMonitor() {
+  const [activeScans, setActiveScans] = useState([]);
+  const notifiedRef = useRef(new Set());
+
+  useEffect(() => {
+    // Pedir permiso de notificaciones
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    const poll = async () => {
+      try {
+        // Scans activos
+        const ar = await fetch(`${API}/scans/active`);
+        if (ar.ok) setActiveScans(await ar.json());
+
+        // Notificaciones (completados recientes)
+        const nr = await fetch(`${API}/scans/notifications`);
+        if (nr.ok) {
+          const recent = await nr.json();
+          recent.forEach(s => {
+            if (!notifiedRef.current.has(s.id)) {
+              notifiedRef.current.add(s.id);
+              // Notificación del navegador
+              if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("SniperAI — Scan Completado", {
+                  body: `${s.target} [${s.mode?.toUpperCase()}] — ${s.status === "completed" ? "Listo para analizar con IA" : "Finalizado con error"}`,
+                  icon: "/favicon.ico",
+                  tag: s.id,
+                });
+              }
+            }
+          });
+        }
+      } catch {}
+    };
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return activeScans;
+}
+
+function Sidebar({ stats, activeScans }) {
   const location = useLocation();
 
   return (
@@ -44,10 +90,7 @@ function Sidebar({ stats }) {
         {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
           const active = location.pathname === path || (path !== "/" && location.pathname.startsWith(path));
           return (
-            <NavLink
-              key={path}
-              to={path}
-              data-testid={`nav-${label.toLowerCase().replace(/\s/g, "-")}`}
+            <NavLink key={path} to={path} data-testid={`nav-${label.toLowerCase().replace(/\s/g, "-")}`}
               style={{
                 display: "flex", alignItems: "center", gap: 10,
                 padding: "9px 16px", textDecoration: "none",
@@ -55,8 +98,7 @@ function Sidebar({ stats }) {
                 background: active ? "rgba(0,255,65,0.06)" : "transparent",
                 borderLeft: active ? "2px solid #00FF41" : "2px solid transparent",
                 fontSize: 13, fontWeight: 500, transition: "all 150ms ease"
-              }}
-            >
+              }}>
               <Icon size={15} strokeWidth={1.5} />
               {label}
             </NavLink>
@@ -66,20 +108,18 @@ function Sidebar({ stats }) {
 
       {/* Stats footer */}
       <div style={{ padding: "12px 16px", borderTop: "1px solid #1A2235" }}>
-        <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "JetBrains Mono", letterSpacing: "0.15em", marginBottom: 8 }}>
-          SYSTEM
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+        <div style={{ fontSize: 10, color: "#94A3B8", fontFamily: "JetBrains Mono", letterSpacing: "0.15em", marginBottom: 8 }}>SYSTEM</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: stats?.sniper_available ? "#00FF41" : "#FF3B30" }} />
           <span style={{ color: stats?.sniper_available ? "#00FF41" : "#FF5A00", fontFamily: "JetBrains Mono", fontSize: 11 }}>
             {stats?.sniper_available ? "SNIPER ONLINE" : "DEMO MODE"}
           </span>
         </div>
-        {stats?.active_scans > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 11 }}>
-            <Activity size={11} color="#00FF41" />
+        {activeScans.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "rgba(0,255,65,0.08)", border: "1px solid rgba(0,255,65,0.3)", padding: "4px 8px" }}>
+            <Activity size={11} color="#00FF41" style={{ animation: "spin 2s linear infinite" }} />
             <span style={{ color: "#00FF41", fontFamily: "JetBrains Mono" }}>
-              {stats.active_scans} ACTIVE SCAN{stats.active_scans > 1 ? "S" : ""}
+              {activeScans.length} SCAN{activeScans.length > 1 ? "S" : ""} ACTIVO{activeScans.length > 1 ? "S" : ""}
             </span>
           </div>
         )}
@@ -90,11 +130,10 @@ function Sidebar({ stats }) {
 
 function AppLayout() {
   const [stats, setStats] = useState(null);
+  const activeScans = useGlobalScanMonitor();
 
   useEffect(() => {
-    const fetchStats = () => {
-      fetch(`${API}/stats`).then(r => r.json()).then(setStats).catch(() => {});
-    };
+    const fetchStats = () => fetch(`${API}/stats`).then(r => r.json()).then(setStats).catch(() => {});
     fetchStats();
     const interval = setInterval(fetchStats, 10000);
     return () => clearInterval(interval);
@@ -102,7 +141,7 @@ function AppLayout() {
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#05070A" }}>
-      <Sidebar stats={stats} />
+      <Sidebar stats={stats} activeScans={activeScans} />
       <main style={{ flex: 1, overflow: "auto" }}>
         <Routes>
           <Route path="/" element={<Dashboard stats={stats} />} />

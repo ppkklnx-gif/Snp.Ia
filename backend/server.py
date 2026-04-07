@@ -179,9 +179,10 @@ def build_sniper_command(scan: dict) -> list:
     options = scan.get("options", {})
     if isinstance(options, str):
         options = json.loads(options)
-    cmd = ["sniper", "-t", scan["target"], "-m", scan.get("mode", "normal"), "-w", scan.get("workspace", "default")]
-    if options.get("osint"):   cmd.append("-o")
-    if options.get("recon"):   cmd.append("-re")
+    # sudo requerido para que sniper pueda ejecutar nmap, metasploit, etc.
+    cmd = ["sudo", "sniper", "-t", scan["target"], "-m", scan.get("mode", "normal"), "-w", scan.get("workspace", "default")]
+    if options.get("osint"):      cmd.append("-o")
+    if options.get("recon"):      cmd.append("-re")
     if options.get("bruteforce"): cmd.append("-b")
     if options.get("full_port"):  cmd.append("-fp")
     return cmd
@@ -722,6 +723,141 @@ async def get_all_findings(severity: Optional[str] = None, limit: int = 200):
             "SELECT * FROM findings ORDER BY created_at DESC LIMIT ?", (limit,))
     await db.close()
     return [row_to_dict(r) for r in rows]
+
+
+# ────────────── NOTIFICACIONES ──────────────
+
+@api_router.get("/scans/notifications")
+async def get_scan_notifications():
+    """Devuelve scans que recién completaron (para notificaciones del frontend)."""
+    db = await get_db()
+    # Scans completados en los últimos 30 segundos
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    rows = await db.execute_fetchall(
+        "SELECT id, target, mode, status, completed_at FROM scans WHERE status IN ('completed','failed') AND completed_at > ? ORDER BY completed_at DESC",
+        (cutoff,)
+    )
+    await db.close()
+    return [dict(r) for r in rows]
+
+
+@api_router.get("/scans/active")
+async def get_active_scans():
+    """Lista de scans activos para el monitor global."""
+    db = await get_db()
+    rows = await db.execute_fetchall(
+        "SELECT id, target, mode, status, created_at FROM scans WHERE status IN ('running','pending') ORDER BY created_at DESC"
+    )
+    await db.close()
+    return [dict(r) for r in rows]
+
+
+# ────────────── METASPLOIT ──────────────
+
+class MsfRequest(BaseModel):
+    scan_id: str
+    module: str        # e.g. "exploit/unix/ftp/vsftpd_234_backdoor"
+    target: str
+    port: Optional[int] = None
+    lhost: Optional[str] = "127.0.0.1"
+    lport: Optional[int] = 4444
+    options: Dict[str, str] = {}
+
+
+async def run_msf_module(job_id: str, req: MsfRequest):
+    """Ejecuta un módulo de Metasploit y guarda el output."""
+    log_file = f"{LOG_DIR}/msf_{job_id}.log"
+    db = await get_db()
+    await db.execute(
+        "INSERT OR REPLACE INTO msf_jobs (id, scan_id, module, target, status, log_file, created_at) VALUES (?,?,?,?,?,?,?)",
+        (job_id, req.scan_id, req.module, req.target, "running", log_file, now_iso())
+    )
+    await db.commit()
+    await db.close()
+
+    # Construir comandos msfconsole
+    port_opt = f"set RPORT {req.port}; " if req.port else ""
+    extra_opts = " ".join([f"set {k} {v}; " for k, v in req.options.items()])
+    msf_cmds = (
+        f"setg RHOSTS {req.target}; setg RHOST {req.target}; "
+        f"setg LHOST {req.lhost}; setg LPORT {req.lport}; "
+        f"{port_opt}{extra_opts}"
+        f"use {req.module}; run; exit;"
+    )
+    cmd = ["sudo", "msfconsole", "-q", "-x", msf_cmds]
+
+    try:
+        with open(log_file, "w") as lf:
+            process = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
+            )
+            async for line in process.stdout:
+                decoded = line.decode("utf-8", errors="replace")
+                lf.write(decoded)
+                lf.flush()
+            await process.wait()
+
+        status = "completed"
+        # Detectar si obtuvo sesión
+        with open(log_file) as lf:
+            output = lf.read()
+        if any(x in output for x in ["Meterpreter session", "Command shell session", "session opened"]):
+            status = "pwned"
+    except Exception as e:
+        status = "failed"
+        with open(log_file, "a") as lf:
+            lf.write(f"\n[ERROR] {e}\n")
+
+    db2 = await get_db()
+    await db2.execute("UPDATE msf_jobs SET status=?, completed_at=? WHERE id=?", (status, now_iso(), job_id))
+    await db2.commit()
+    await db2.close()
+
+
+@api_router.post("/msf/run")
+async def msf_run(req: MsfRequest, background_tasks: BackgroundTasks):
+    # Verificar que msfconsole está disponible
+    try:
+        r = subprocess.run(["which", "msfconsole"], capture_output=True, timeout=3)
+        if r.returncode != 0:
+            raise HTTPException(status_code=400, detail="msfconsole no instalado. Instala Metasploit Framework.")
+    except Exception:
+        raise HTTPException(status_code=400, detail="msfconsole no disponible.")
+
+    job_id = str(uuid.uuid4())
+    background_tasks.add_task(run_msf_module, job_id, req)
+    return {"job_id": job_id, "status": "started", "module": req.module}
+
+
+@api_router.get("/msf/jobs/{job_id}")
+async def get_msf_job(job_id: str):
+    db = await get_db()
+    row = await (await db.execute("SELECT * FROM msf_jobs WHERE id=?", (job_id,))).fetchone()
+    await db.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found")
+    d = dict(row)
+    log_file = d.get("log_file", "")
+    if log_file and os.path.exists(log_file):
+        with open(log_file, "r", errors="replace") as f:
+            d["output"] = f.read()
+    else:
+        d["output"] = ""
+    return d
+
+
+@api_router.get("/msf/jobs/{job_id}/output")
+async def get_msf_output(job_id: str, offset: int = 0):
+    db = await get_db()
+    row = await (await db.execute("SELECT log_file, status FROM msf_jobs WHERE id=?", (job_id,))).fetchone()
+    await db.close()
+    if not row or not row[0] or not os.path.exists(row[0]):
+        return {"lines": [], "offset": 0, "status": "unknown"}
+    with open(row[0], "r", errors="replace") as f:
+        lines = f.readlines()
+    new_lines = lines[offset:]
+    return {"lines": [l.rstrip() for l in new_lines], "offset": offset + len(new_lines), "status": row[1]}
 
 
 app.include_router(api_router)

@@ -89,6 +89,17 @@ async def init_db():
             created_at TEXT,
             completed_at TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS msf_jobs (
+            id TEXT PRIMARY KEY,
+            scan_id TEXT,
+            module TEXT,
+            target TEXT,
+            status TEXT DEFAULT 'running',
+            log_file TEXT,
+            created_at TEXT,
+            completed_at TEXT
+        );
     """)
     await db.commit()
     await db.close()

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { API } from "../App";
 import { Zap, Copy, Check, ChevronRight, Loader, AlertTriangle, Shield, Target, Activity } from "lucide-react";
 import ChainAttack from "./ChainAttack";
+import MsfRunner from "./MsfRunner";
 
 const PRIORITY_COLORS = { CRITICAL: "#FF3B30", HIGH: "#FF5A00", MEDIUM: "#FFB020", LOW: "#4299E1" };
 const RISK_COLORS = { CRITICAL: "#FF3B30", HIGH: "#FF5A00", MEDIUM: "#FFB020", LOW: "#4299E1", INFO: "#94A3B8", UNKNOWN: "#94A3B8" };
@@ -72,18 +73,21 @@ export default function AttackPlan() {
   const navigate = useNavigate();
   const [plan, setPlan] = useState(null);
   const [scan, setScan] = useState(null);
+  const [findings, setFindings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [showChain, setShowChain] = useState(false);
 
   const fetchPlan = async () => {
-    const [planRes, scanRes] = await Promise.all([
+    const [planRes, scanRes, findRes] = await Promise.all([
       fetch(`${API}/scans/${id}/plan`),
-      fetch(`${API}/scans/${id}`)
+      fetch(`${API}/scans/${id}`),
+      fetch(`${API}/scans/${id}/findings`)
     ]);
     if (planRes.ok) setPlan(await planRes.json());
     if (scanRes.ok) setScan(await scanRes.json());
+    if (findRes.ok) setFindings(await findRes.json());
     setLoading(false);
   };
 
@@ -280,6 +284,18 @@ export default function AttackPlan() {
             <div style={{ background: "rgba(66,153,225,0.06)", border: "1px solid rgba(66,153,225,0.2)", padding: 16 }}>
               <div className="section-label" style={{ color: "#4299E1", marginBottom: 8 }}>DEFENDER REMEDIATION</div>
               <p style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.6 }}>{plan.remediation_summary}</p>
+            </div>
+          )}
+
+          {/* Metasploit Runner */}
+          {scan?.target && (
+            <div style={{ marginTop: 24 }}>
+              <div className="section-label" style={{ marginBottom: 10, color: "#FF3B30" }}>METASPLOIT EXPLOITATION</div>
+              <MsfRunner
+                target={scan.target}
+                scanId={id}
+                findings={findings}
+              />
             </div>
           )}
         </div>
