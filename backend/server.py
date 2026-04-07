@@ -167,12 +167,41 @@ DEMO_FINDINGS = [
 
 # ────────────── HELPERS ──────────────
 
+SNIPER_PATHS = [
+    "/usr/share/sniper/sniper",
+    "/usr/bin/sniper",
+    "/usr/local/bin/sniper",
+    "/opt/sniper/sniper",
+]
+
 def is_sniper_available() -> bool:
+    """Detecta Sn1per en PATH o en rutas conocidas de Kali."""
+    # Verificar en PATH primero
     try:
-        result = subprocess.run(["which", "sniper"], capture_output=True, timeout=3)
-        return result.returncode == 0
+        r = subprocess.run(["which", "sniper"], capture_output=True, timeout=3)
+        if r.returncode == 0:
+            return True
     except Exception:
-        return False
+        pass
+    # Verificar rutas conocidas
+    for path in SNIPER_PATHS:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return True
+    return False
+
+
+def get_sniper_cmd() -> str:
+    """Retorna la ruta completa al ejecutable sniper."""
+    try:
+        r = subprocess.run(["which", "sniper"], capture_output=True, timeout=3)
+        if r.returncode == 0:
+            return r.stdout.decode().strip()
+    except Exception:
+        pass
+    for path in SNIPER_PATHS:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return "sniper"
 
 
 def build_sniper_command(scan: dict) -> list:
@@ -180,7 +209,8 @@ def build_sniper_command(scan: dict) -> list:
     if isinstance(options, str):
         options = json.loads(options)
     # sudo requerido para que sniper pueda ejecutar nmap, metasploit, etc.
-    cmd = ["sudo", "sniper", "-t", scan["target"], "-m", scan.get("mode", "normal"), "-w", scan.get("workspace", "default")]
+    sniper = get_sniper_cmd()
+    cmd = ["sudo", sniper, "-t", scan["target"], "-m", scan.get("mode", "normal"), "-w", scan.get("workspace", "default")]
     if options.get("osint"):      cmd.append("-o")
     if options.get("recon"):      cmd.append("-re")
     if options.get("bruteforce"): cmd.append("-b")
@@ -443,7 +473,13 @@ NEXT_SCAN: sniper -t {target} -m <mode> [options] -w {workspace}"""
 
 @api_router.get("/")
 async def root():
-    return {"status": "SniperAI API online", "sniper_available": is_sniper_available(), "storage": "SQLite"}
+    sniper_path = get_sniper_cmd() if is_sniper_available() else None
+    return {
+        "status": "SniperAI API online",
+        "sniper_available": is_sniper_available(),
+        "sniper_path": sniper_path,
+        "storage": "SQLite"
+    }
 
 
 @api_router.get("/stats")
