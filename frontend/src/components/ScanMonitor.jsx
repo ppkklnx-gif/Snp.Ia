@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { API } from "../App";
-import { Zap, Square, ChevronRight, Loader, RefreshCw, AlertTriangle, Terminal as TerminalIcon } from "lucide-react";
+import { Zap, Square, ChevronRight, Loader, RefreshCw, AlertTriangle, Terminal as TerminalIcon, Activity } from "lucide-react";
 import { SeverityBadge, StatusBadge } from "./Dashboard";
 
 function colorLine(line) {
@@ -161,6 +161,14 @@ export default function ScanMonitor() {
           {scan.has_plan && (
             <button className="btn-secondary" data-testid="view-plan-btn" onClick={() => navigate(`/scan/${id}/plan`)}>
               <ChevronRight size={12} /> ATTACK PLAN
+            </button>
+          )}
+          {(scan.status === "completed") && (
+            <button
+              data-testid="chain-attack-monitor-btn"
+              onClick={() => navigate(`/scan/${id}/plan`)}
+              style={{ background: "rgba(255,176,32,0.08)", border: "1px solid rgba(255,176,32,0.4)", color: "#FFB020", cursor: "pointer", padding: "7px 14px", fontSize: 11, fontFamily: "JetBrains Mono", display: "flex", alignItems: "center", gap: 6 }}>
+              <Activity size={12} /> CHAIN ATTACK
             </button>
           )}
         </div>

@@ -5,7 +5,7 @@ Build an AI-enhanced web dashboard for Sn1per (automated pentesting tool). The A
 
 ## Architecture
 - **Frontend**: React + Tailwind (dark hacker aesthetic, JetBrains Mono, terminal green #00FF41)
-- **Backend**: FastAPI + MongoDB
+- **Backend**: FastAPI + SQLite (aiosqlite, sin MongoDB - compatible con Kali)
 - **AI**: GPT-4.1 via Emergent Universal Key (emergentintegrations library)
 - **Scan execution**: Real Sn1per when installed / Demo mode with realistic simulated data when not
 

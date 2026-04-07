@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { API } from "../App";
-import { Zap, Copy, Check, ChevronRight, Loader, AlertTriangle, Shield, Target } from "lucide-react";
+import { Zap, Copy, Check, ChevronRight, Loader, AlertTriangle, Shield, Target, Activity } from "lucide-react";
+import ChainAttack from "./ChainAttack";
 
 const PRIORITY_COLORS = { CRITICAL: "#FF3B30", HIGH: "#FF5A00", MEDIUM: "#FFB020", LOW: "#4299E1" };
 const RISK_COLORS = { CRITICAL: "#FF3B30", HIGH: "#FF5A00", MEDIUM: "#FFB020", LOW: "#4299E1", INFO: "#94A3B8", UNKNOWN: "#94A3B8" };
@@ -74,6 +75,7 @@ export default function AttackPlan() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [pollCount, setPollCount] = useState(0);
+  const [showChain, setShowChain] = useState(false);
 
   const fetchPlan = async () => {
     const [planRes, scanRes] = await Promise.all([
@@ -129,12 +131,25 @@ export default function AttackPlan() {
           <button className="btn-secondary" data-testid="back-to-scan-btn" onClick={() => navigate(`/scan/${id}`)}>
             <ChevronRight size={12} style={{ transform: "rotate(180deg)" }} /> BACK TO SCAN
           </button>
+          <button
+            data-testid="chain-attack-btn"
+            onClick={() => setShowChain(v => !v)}
+            style={{ background: showChain ? "rgba(255,176,32,0.1)" : "transparent", border: "1px solid rgba(255,176,32,0.4)", color: "#FFB020", cursor: "pointer", padding: "7px 14px", fontSize: 11, fontFamily: "JetBrains Mono", display: "flex", alignItems: "center", gap: 6 }}>
+            <Activity size={12} /> {showChain ? "OCULTAR CHAIN" : "CHAIN ATTACK"}
+          </button>
           <button className="btn-primary" data-testid="reanalyze-btn" onClick={triggerAnalysis} disabled={analyzing}>
             {analyzing ? <Loader size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={12} />}
             {analyzing ? "ANALYZING..." : "RE-ANALYZE"}
           </button>
         </div>
       </div>
+
+      {/* Chain Attack Panel */}
+      {showChain && (
+        <div style={{ marginBottom: 24 }} className="fade-in">
+          <ChainAttack scanId={id} onClose={() => setShowChain(false)} />
+        </div>
+      )}
 
       {/* Not ready state */}
       {isNotReady && (
