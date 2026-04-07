@@ -22,7 +22,7 @@ python3 -c "import fastapi, aiosqlite" 2>/dev/null || {
 echo -e "${GREEN}[+] Iniciando SniperAI...${NC}"
 
 # Puerto del frontend (si existe)
-FRONTEND_PORT=3000
+FRONTEND_PORT=3001
 BACKEND_PORT=8001
 
 # ── Backend ──
@@ -46,6 +46,10 @@ if command -v node &> /dev/null && [ -d "frontend" ]; then
     if [ ! -f ".env" ]; then
         echo "REACT_APP_BACKEND_URL=http://localhost:${BACKEND_PORT}" > .env
         echo "WDS_SOCKET_PORT=443" >> .env
+        echo "PORT=3001" >> .env
+    else
+        # Asegurar PORT=3001 aunque el .env ya exista
+        grep -q "^PORT=" .env && sed -i 's/^PORT=.*/PORT=3001/' .env || echo "PORT=3001" >> .env
     fi
 
     if command -v yarn &> /dev/null; then
