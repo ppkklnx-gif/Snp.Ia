@@ -540,6 +540,33 @@ async def list_scans():
     return [row_to_dict(r) for r in rows]
 
 
+# ── Rutas estáticas ANTES de /{scan_id} para evitar conflicto de rutas ──
+
+@api_router.get("/scans/active")
+async def get_active_scans():
+    """Lista de scans activos para el monitor global."""
+    db = await get_db()
+    rows = await db.execute_fetchall(
+        "SELECT id, target, mode, status, created_at FROM scans WHERE status IN ('running','pending') ORDER BY created_at DESC"
+    )
+    await db.close()
+    return [dict(r) for r in rows]
+
+
+@api_router.get("/scans/notifications")
+async def get_scan_notifications():
+    """Devuelve scans que recién completaron (para notificaciones del frontend)."""
+    from datetime import timedelta
+    db = await get_db()
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
+    rows = await db.execute_fetchall(
+        "SELECT id, target, mode, status, completed_at FROM scans WHERE status IN ('completed','failed') AND completed_at > ? ORDER BY completed_at DESC",
+        (cutoff,)
+    )
+    await db.close()
+    return [dict(r) for r in rows]
+
+
 @api_router.get("/scans/{scan_id}")
 async def get_scan(scan_id: str):
     db = await get_db()
@@ -760,33 +787,6 @@ async def get_all_findings(severity: Optional[str] = None, limit: int = 200):
     await db.close()
     return [row_to_dict(r) for r in rows]
 
-
-# ────────────── NOTIFICACIONES ──────────────
-
-@api_router.get("/scans/notifications")
-async def get_scan_notifications():
-    """Devuelve scans que recién completaron (para notificaciones del frontend)."""
-    db = await get_db()
-    # Scans completados en los últimos 30 segundos
-    from datetime import timedelta
-    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
-    rows = await db.execute_fetchall(
-        "SELECT id, target, mode, status, completed_at FROM scans WHERE status IN ('completed','failed') AND completed_at > ? ORDER BY completed_at DESC",
-        (cutoff,)
-    )
-    await db.close()
-    return [dict(r) for r in rows]
-
-
-@api_router.get("/scans/active")
-async def get_active_scans():
-    """Lista de scans activos para el monitor global."""
-    db = await get_db()
-    rows = await db.execute_fetchall(
-        "SELECT id, target, mode, status, created_at FROM scans WHERE status IN ('running','pending') ORDER BY created_at DESC"
-    )
-    await db.close()
-    return [dict(r) for r in rows]
 
 
 # ────────────── METASPLOIT ──────────────
