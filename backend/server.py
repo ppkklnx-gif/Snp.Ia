@@ -239,6 +239,9 @@ async def insert_finding(scan_id: str, workspace: str, host: str, f: dict):
 async def run_real_scan(scan_id: str, scan_doc: dict):
     log_file = f"{LOG_DIR}/{scan_id}.log"
     cmd = build_sniper_command(scan_doc)
+    mode = scan_doc.get("mode", "normal")
+    target = scan_doc.get("target", "")
+
     db = await get_db()
     try:
         await db.execute("UPDATE scans SET status='running', started_at=?, log_file=? WHERE id=?",
@@ -247,20 +250,47 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
     finally:
         await db.close()
 
+    # Escribir cabecera inmediata para que el terminal muestre algo
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(log_file, "w") as lf:
+        lf.write(f"[*] SniperAI — Iniciando escaneo real\n")
+        lf.write(f"[*] Target:    {target}\n")
+        lf.write(f"[*] Modo:      {mode.upper()}\n")
+        lf.write(f"[*] Comando:   {' '.join(cmd)}\n")
+        lf.write(f"[*] Inicio:    {ts}\n")
+        if mode == "vulnscan":
+            lf.write(f"[!] VULNSCAN usa OpenVAS/GVM — asegurate de tener el daemon corriendo:\n")
+            lf.write(f"[!]   sudo gvm-start   (o: sudo systemctl start greenbone-security-assistant)\n")
+        lf.write(f"{'='*70}\n\n")
+
     try:
-        with open(log_file, "w") as lf:
+        # stdbuf -oL fuerza output line-buffered (evita que sniper bufferee)
+        # TERM=xterm necesario para que sniper produzca output con colores/formato
+        full_cmd = ["stdbuf", "-oL"] + cmd
+        env = {**os.environ, "TERM": "xterm", "DEBIAN_FRONTEND": "noninteractive"}
+
+        with open(log_file, "a") as lf:
             process = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+                *full_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+            )
             db2 = await get_db()
             await db2.execute("UPDATE scans SET pid=? WHERE id=?", (process.pid, scan_id))
             await db2.commit()
             await db2.close()
 
             async for line in process.stdout:
-                lf.write(line.decode("utf-8", errors="replace"))
+                decoded = line.decode("utf-8", errors="replace")
+                lf.write(decoded)
                 lf.flush()
+
             await process.wait()
             rc = process.returncode
+            lf.write(f"\n{'='*70}\n")
+            lf.write(f"[*] Proceso terminado con código: {rc}\n")
+            lf.write(f"[*] Fin: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
         status = "completed" if rc == 0 else "failed"
         db3 = await get_db()
@@ -269,13 +299,44 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
         await db3.close()
 
         workspace = scan_doc.get("workspace", scan_doc["target"])
-        xml_path = os.path.join(get_workspace_dir(workspace), "nmap", f"nmap-{scan_doc['target']}.xml")
+        xml_path = os.path.join(get_workspace_dir(workspace), "nmap", f"nmap-{target}.xml")
         if os.path.exists(xml_path):
-            findings = extract_findings_from_nmap(xml_path, scan_id, workspace, scan_doc["target"])
+            findings = extract_findings_from_nmap(xml_path, scan_id, workspace, target)
             for f in findings:
-                await insert_finding(scan_id, workspace, scan_doc["target"], f)
+                await insert_finding(scan_id, workspace, target, f)
+
+    except FileNotFoundError:
+        # stdbuf no disponible, intentar sin él
+        with open(log_file, "a") as lf:
+            lf.write("[!] stdbuf no encontrado, corriendo sin buffer control...\n")
+        try:
+            env = {**os.environ, "TERM": "xterm"}
+            with open(log_file, "a") as lf:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=env,
+                )
+                db2 = await get_db()
+                await db2.execute("UPDATE scans SET pid=? WHERE id=?", (process.pid, scan_id))
+                await db2.commit()
+                await db2.close()
+                async for line in process.stdout:
+                    lf.write(line.decode("utf-8", errors="replace"))
+                    lf.flush()
+                await process.wait()
+            db3 = await get_db()
+            await db3.execute("UPDATE scans SET status='completed', completed_at=? WHERE id=?", (now_iso(), scan_id))
+            await db3.commit()
+            await db3.close()
+        except Exception as e2:
+            logger.error(f"Scan {scan_id} error (fallback): {e2}")
+
     except Exception as e:
-        logger.error(f"Scan {scan_id} error: {e}")
+        logger.error(f"Scan {scan_id} failed: {e}")
+        with open(log_file, "a") as lf:
+            lf.write(f"\n[ERROR] {e}\n")
         db4 = await get_db()
         await db4.execute("UPDATE scans SET status='failed', error=? WHERE id=?", (str(e), scan_id))
         await db4.commit()
