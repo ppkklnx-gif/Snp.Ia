@@ -1,0 +1,138 @@
+{
+  "theme": "Dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) + Retro-Futurism Surface Strategy",
+  "domain": "Cybersecurity / Pentesting Dashboard",
+  "brand_identity": "Dark cybersecurity hacker aesthetic. Real automated attack tool look. Powerful, stealthy, authoritative.",
+  "colors": {
+    "background": "#05070A",
+    "foreground": "#E2E8F0",
+    "primary": {
+      "DEFAULT": "#00FF41",
+      "hover": "#00CC33",
+      "foreground": "#05070A"
+    },
+    "secondary": {
+      "DEFAULT": "#111622",
+      "hover": "#1A2235",
+      "foreground": "#E2E8F0"
+    },
+    "muted": {
+      "DEFAULT": "#111622",
+      "foreground": "#94A3B8"
+    },
+    "accent": {
+      "DEFAULT": "#1A2235",
+      "foreground": "#00FF41"
+    },
+    "destructive": {
+      "DEFAULT": "#FF3B30",
+      "hover": "#CC2F26",
+      "foreground": "#FFFFFF"
+    },
+    "warning": {
+      "DEFAULT": "#FFB020",
+      "foreground": "#05070A"
+    },
+    "border": "#1A2235",
+    "input": "#111622",
+    "ring": "#00FF41"
+  },
+  "typography": {
+    "strategy": "The 'Swiss Brutalist' (Tech / Art) - Radical weight contrast + Developer UI focus",
+    "heading_font": "JetBrains Mono",
+    "body_font": "IBM Plex Sans",
+    "mono_font": "JetBrains Mono",
+    "scales": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-tight",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed text-neutral-300",
+      "small": "text-sm text-neutral-400",
+      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-green-500"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_system": "MODE B: THE 'CONTROL ROOM' GRID",
+    "container_padding": "p-4 sm:p-6 lg:p-8",
+    "gap_strategy": "Tight (gap-4 or gap-6) to maximize density and data correlation.",
+    "alignment": "Strict left-alignment for all data, tables, and terminal outputs. Center only for empty states.",
+    "border_radius": "Sharp edges. Use rounded-none or max rounded-sm (2px) for interactive elements."
+  },
+  "surface_strategies": {
+    "primary_strategy": "RETRO-FUTURISM (The 'Terminal' Look)",
+    "cards": "Flat background (#111622), 1px solid border (#1A2235). On hover: border-green-500/50 with drop-shadow-[0_0_8px_rgba(0,255,65,0.2)].",
+    "terminal_window": "Deep black background (#000000 or #05070A), font-mono, text-green-500, with optional CSS scanlines repeating-linear-gradient overlay.",
+    "headers": "Solid background (#05070A) with a hard 1px bottom border (#1A2235). No glassmorphism.",
+    "active_states": "Use 'The Tracing Beam' strategy for active scans (animated glowing border)."
+  },
+  "motion_and_interaction": {
+    "hover_states": "Always explicitly set text color. E.g., hover:bg-green-500 hover:text-black.",
+    "focus_states": "focus:ring-2 focus:ring-green-500/50 focus:outline-none.",
+    "transitions": "Snappy and mechanical. transition-all duration-150 ease-in-out.",
+    "terminal_text": "Typing effects for AI analysis or incoming scan data to simulate real-time hacker tool output."
+  },
+  "components_customization": {
+    "buttons": "Sharp corners, high contrast. Primary button: bg-green-500 text-black font-mono uppercase tracking-widest hover:bg-green-400.",
+    "inputs": "bg-[#111622] border-[#1A2235] text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 rounded-none.",
+    "tables": "Dense rows. Header text uppercase tracking-wider text-neutral-400. 1px bottom border for rows.",
+    "badges": "Square. Danger: bg-red-500/10 text-red-500 border border-red-500/50. Warning: bg-amber-500/10 text-amber-500 border border-amber-500/50.",
+    "dialogs": "Dark overlay (bg-black/80 backdrop-blur-sm). Modal bg #111622, hard 1px border #1A2235."
+  },
+  "icons_and_assets": {
+    "library": "lucide-react",
+    "rules": "Use stroke-width 1.5. Colors should match the text or status (e.g., green for success/active, red for critical vulnerabilities)."
+  },
+  "accessibility": {
+    "contrast": "Ensure minimum 4.5:1 ratio for standard text. Terminal green (#00FF41) on black (#05070A) easily passes.",
+    "testing": "All interactive elements MUST include data-testid attribute (e.g., data-testid='start-scan-button')."
+  },
+  "pages": {
+    "dashboard_home": {
+      "layout": "Control room grid. Top row: Key stats (Active Scans, Critical CVEs, Auto-Pwn Targets). Middle: Real-time scan activity chart. Bottom: Recent findings table.",
+      "visuals": "Dense data, use high-contrast badges for vulnerabilities."
+    },
+    "new_scan": {
+      "layout": "Split layout. Left: Target input and configuration form. Right: AI Mode Recommendation panel with terminal-style breakdown of what the scan will do.",
+      "visuals": "Inputs with sharp borders, glowing focus rings. 'Launch Scan' as a massive, high-contrast CTA."
+    },
+    "scan_monitor": {
+      "layout": "Vertical split. Left (60%): Real-time Terminal Output Stream (black bg, green monospace). Right (40%): AI Live Analysis panel summarizing findings as they appear.",
+      "visuals": "Terminal must have sticky scroll, scanline overlay. AI panel uses 'Tracing Beam' border to show active thinking."
+    },
+    "attack_plan": {
+      "layout": "Timeline or step-by-step node graph. Each phase (Recon, Exploit, Post-Exploitation) clearly marked with executable commands.",
+      "visuals": "Use dashed lines connecting phases. Executable commands in 'Retro-Futurism' code blocks with 'Copy' or 'Auto-Execute' buttons."
+    },
+    "results_loot": {
+      "layout": "Data table heavy. Filters on top (Severity, Host, Port). Expandable rows for detailed CVE mapping and extracted credentials.",
+      "visuals": "Use colors strictly for severity (Red=Critical, Orange=High, Yellow=Medium, Blue=Low)."
+    },
+    "workspaces": {
+      "layout": "Grid of cards. Each card represents a workspace/target.",
+      "visuals": "Cards have 1px borders. Hover lifts the card slightly with a subtle green ambient shadow."
+    }
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.pexels.com/photos/1089438/pexels-photo-1089438.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Abstract green matrix code background with binary style.",
+      "usage": "Use with low opacity (10-20%) as a subtle texture behind the 'New Scan' configuration panel or empty states."
+    },
+    "alert_texture": {
+      "url": "https://images.pexels.com/photos/18545023/pexels-photo-18545023.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Dynamic abstract scene with red neon lights and geometric patterns.",
+      "usage": "Use as a background layer for the 'Attack Plan' or 'Critical Vulnerability' modal with heavy black gradient overlay (bg-black/80)."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the Retro-Futurism/Terminal visual aesthetic. This is a hacker tool, not a consumer SaaS.",
+    "Do not use generic Shadcn styling. Override border radii to 0 or 2px max, use the defined dark background colors.",
+    "Implement the 'Terminal Stream' with actual monospace fonts and a raw HTML/Tailwind styling to look like a real CLI.",
+    "Use JetBrains Mono for all headings and data points. IBM Plex Sans for long-form reading text.",
+    "Ensure all buttons and inputs have a data-testid attribute.",
+    "Do not use emojis anywhere.",
+    "Use pure HTML + Tailwind for complex/overlapping layouts, and Shadcn ONLY for interactive logic (customizing its styles heavily).",
+    "Limit the use of the primary green color to CTAs and active states to maintain its impact."
+  ]
+}
