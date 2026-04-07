@@ -1,203 +1,201 @@
-import os
-import json
-import uuid
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+"""
+AI Engine para SniperAI
+Estrategia de carga:
+  1. Si está disponible → usa emergentintegrations (Emergent cloud, key incluida)
+  2. Si no → usa openai SDK estándar con AI_API_KEY del .env
+     Soporta OpenAI, Anthropic (vía openai-compatible), etc.
+"""
+import os, json, uuid, logging
 from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv(Path(__file__).parent / '.env')
+logger = logging.getLogger(__name__)
 
-LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
-LLM_PROVIDER = "openai"
-LLM_MODEL = "gpt-4.1"
+AI_API_KEY  = os.environ.get("AI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+AI_MODEL    = os.environ.get("AI_MODEL", "gpt-4o")
+AI_BASE_URL = os.environ.get("AI_BASE_URL", None)
 
-SNIPER_EXPERT_SYSTEM = """You are SniperAI, an elite offensive security AI integrated with the Sn1per Attack Surface Management Platform v9.2.
-You are a world-class penetration tester who deeply understands ALL Sn1per modes, capabilities, and advanced attack chaining strategies.
+# Intenta cargar emergentintegrations (disponible en Emergent cloud)
+try:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", AI_API_KEY)
+    USE_EMERGENT = bool(EMERGENT_KEY)
+    logger.info("emergentintegrations disponible — modo Emergent cloud")
+except ImportError:
+    USE_EMERGENT = False
+    logger.info("emergentintegrations no encontrado — usando openai SDK estándar")
 
-## COMPLETE SNIPER MODE REFERENCE:
+if not USE_EMERGENT:
+    from openai import AsyncOpenAI
 
-### SINGLE TARGET MODES:
-- `normal`: Default comprehensive scan. DNS enum, TCP port scan (default ports), per-port nmap scripts + Metasploit modules, web scanning on HTTP/HTTPS ports.
-- `stealth`: Non-intrusive reconnaissance using passive checks. Avoids WAF/IPS/IDS detection.
-- `port`: Deep scan of a SPECIFIC port (-p <port>). All relevant nmap scripts and Metasploit modules for that exact service.
-- `fullportonly`: Full TCP port scan (1-65535). Fast discovery of ALL open ports with XML output.
-- `web`: Comprehensive web application scan on ports 80/443. Nikto, dirb, whatweb, HTTP headers, SSL analysis, whois.
-- `webporthttp`: Full HTTP web app scan on a specific non-standard port.
-- `webporthttps`: Full HTTPS web app scan on a specific non-standard port.
-- `webscan`: Advanced web scan via Burpsuite Professional + Arachni + OWASP ZAP. Most thorough web assessment.
-- `vulnscan`: OpenVAS/GVM vulnerability scan. Best for CVE enumeration and CVSS scoring.
+# ──────────────────────────────────────────────
+SNIPER_SYSTEM = """You are SniperAI, an elite offensive security AI for the Sn1per Attack Surface Management Platform v9.2.
+You are a world-class penetration tester who knows ALL Sn1per modes and attack chaining strategies.
 
-### MULTI-TARGET MODES:
-- `discover`: Parses ALL hosts in a subnet/CIDR and auto-scans each. Use with -w workspace.
-- `flyover`: Fast multi-threaded high-level scan of multiple targets.
-- `airstrike`: Quick port/service enumeration on multiple hosts from a file.
-- `nuke`: FULL comprehensive audit. ALL options enabled: OSINT, recon, bruteforce, full port scan, all MSF modules.
-- `massportscan`: fullportonly on multiple targets.
-- `massweb`: web mode on multiple targets.
-- `masswebscan`: webscan on multiple targets.
-- `massvulnscan`: vulnscan on multiple targets.
+## ALL SNIPER MODES:
+SINGLE: normal, stealth, port, fullportonly, web, webporthttp, webporthttps, webscan, vulnscan
+MULTI:  discover, flyover, airstrike, nuke, massportscan, massweb, masswebscan, massvulnscan
+OPTIONS: -o(OSINT) -re(Recon) -b(Bruteforce) -fp(Full 65535 ports) -w(Workspace)
 
-### KEY OPTIONS:
-- `-o` OSINT (theHarvester, whois, dnsrecon, Shodan, Censys, Hunter.io, GitHub)
-- `-re` Recon (subfinder, amass, massdns, dnsgen)
-- `-b` Bruteforce (Hydra, Medusa for SSH/FTP/SMB/Telnet/HTTP)
-- `-fp` Full port scan (1-65535)
-- `-w <workspace>` Named workspace for organized tracking
-
-### ATTACK CHAINING STRATEGY:
-1. Initial: stealth or normal -> identify attack surface
-2. Web found (80/443/8080/8443): web -> webscan -> webporthttp/https
-3. Full coverage: fullportonly -> targeted port scans
+## ATTACK CHAIN STRATEGY:
+1. Start: stealth/normal -> identify surface
+2. Web ports found: web -> webscan -> webporthttp/https
+3. Full coverage: fullportonly -> per-port deep scans
 4. Network: discover -> airstrike -> nuke
-5. Maximum: nuke mode with -o -re -b -fp
+5. Maximum: nuke -o -re -b -fp
 
 ## YOUR ROLE:
-1. Analyze scan data and identify ALL vulnerabilities and attack vectors
-2. Map findings to CVEs with CVSS scores
-3. Create PHASED attack plans with EXACT Sn1per commands
-4. Chain scan modes intelligently for MAXIMUM coverage
-5. Prioritize attack vectors by exploitability and impact
+Analyze scan data, map CVEs, create phased attack plans with EXACT sniper commands.
 
-## CRITICAL: Return ONLY valid JSON, no markdown, no explanation outside JSON:
+## RETURN ONLY VALID JSON (no markdown, no extra text):
 {
-  "executive_summary": "Tactical assessment for the operator",
+  "executive_summary": "Operator-focused tactical summary",
   "risk_level": "CRITICAL|HIGH|MEDIUM|LOW|INFO",
-  "target_profile": "Technical profile based on fingerprinting",
+  "target_profile": "Technical fingerprint summary",
   "key_findings": ["Critical finding 1", "Critical finding 2"],
   "attack_phases": [
     {
       "phase_number": 1,
-      "phase_name": "Phase name",
+      "phase_name": "Phase Name",
       "priority": "CRITICAL|HIGH|MEDIUM|LOW",
-      "rationale": "Why this phase matters",
+      "rationale": "Why this matters",
       "findings": ["Relevant finding"],
-      "commands": ["sniper -t target -m web -w workspace"],
+      "commands": ["sniper -t TARGET -m web -w WORKSPACE"],
       "expected_outcome": "What this accomplishes"
     }
   ],
-  "immediate_next_command": "Single highest-priority Sn1per command",
-  "cve_findings": [
-    {"cve": "CVE-XXXX-XXXXX", "service": "service name", "severity": "CRITICAL", "description": "Brief description"}
-  ],
+  "immediate_next_command": "Single best next command",
+  "cve_findings": [{"cve": "CVE-XXXX-XXXXX", "service": "svc", "severity": "HIGH", "description": "desc"}],
   "remediation_summary": "Defender perspective"
 }"""
+# ──────────────────────────────────────────────
 
 
-def _make_chat(session_id: str) -> LlmChat:
-    return (
-        LlmChat(
-            api_key=LLM_KEY,
-            session_id=session_id,
-            system_message=SNIPER_EXPERT_SYSTEM,
-        )
-        .with_model(LLM_PROVIDER, LLM_MODEL)
+def _clean(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        end = -1 if lines[-1].strip() in ("```", "```json") else len(lines)
+        text = "\n".join(lines[1:end])
+    return text.strip()
+
+
+async def _ask_emergent(prompt: str, session_id: str) -> str:
+    chat = LlmChat(
+        api_key=EMERGENT_KEY,
+        session_id=session_id,
+        system_message=SNIPER_SYSTEM,
+    ).with_model("openai", "gpt-4.1")
+    return await chat.send_message(UserMessage(text=prompt))
+
+
+async def _ask_openai(prompt: str) -> str:
+    kwargs = {"api_key": AI_API_KEY}
+    if AI_BASE_URL:
+        kwargs["base_url"] = AI_BASE_URL
+    client = AsyncOpenAI(**kwargs)
+    resp = await client.chat.completions.create(
+        model=AI_MODEL,
+        messages=[
+            {"role": "system", "content": SNIPER_SYSTEM},
+            {"role": "user",   "content": prompt},
+        ],
+        temperature=0.3,
+        max_tokens=8000,
     )
+    return resp.choices[0].message.content
 
+
+async def _ask(prompt: str, session_id: str = None) -> str:
+    if USE_EMERGENT:
+        return await _ask_emergent(prompt, session_id or str(uuid.uuid4()))
+    else:
+        return await _ask_openai(prompt)
+
+
+# ──────────────────────────────────────────────
 
 async def analyze_scan_results(scan_data: dict, loot_summary: str) -> dict:
-    """Send scan results to AI for analysis and attack plan generation."""
-    session_id = f"analyze-{uuid.uuid4()}"
-    chat = _make_chat(session_id)
+    prompt = f"""SCAN TO ANALYZE:
+Target: {scan_data.get('target')}  Mode: {scan_data.get('mode')}  Workspace: {scan_data.get('workspace')}
 
-    user_content = f"""SCAN RESULTS TO ANALYZE:
-
-Target: {scan_data.get('target', 'Unknown')}
-Mode: {scan_data.get('mode', 'normal')}
-Workspace: {scan_data.get('workspace', 'default')}
-
-## RAW SCAN OUTPUT & LOOT DATA:
+## SCAN DATA:
 {loot_summary[:80000]}
 
-Analyze comprehensively and generate a complete attack plan. Return ONLY valid JSON."""
-
+Return ONLY valid JSON attack plan."""
     try:
-        response = await chat.send_message(UserMessage(text=user_content))
-        content = response.strip()
-        # Strip markdown code fences if present
-        if content.startswith("```"):
-            lines = content.split("\n")
-            content = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-
-        return json.loads(content)
-    except (json.JSONDecodeError, Exception) as e:
-        return {
-            "executive_summary": f"AI analysis completed for {scan_data.get('target')}. Review raw scan output for manual assessment.",
-            "risk_level": "HIGH",
-            "target_profile": f"Target: {scan_data.get('target')} — scanned with mode: {scan_data.get('mode')}",
-            "key_findings": ["Scan completed — check terminal output for raw findings", "Manual analysis recommended"],
-            "attack_phases": [
-                {
-                    "phase_number": 1,
-                    "phase_name": "Deep Web Assessment",
-                    "priority": "HIGH",
-                    "rationale": "Follow up web scan to identify all HTTP attack surfaces",
-                    "findings": ["Web ports detected"],
-                    "commands": [f"sniper -t {scan_data.get('target')} -m web -w {scan_data.get('workspace', 'default')}"],
-                    "expected_outcome": "Full web vulnerability assessment"
-                }
-            ],
-            "immediate_next_command": f"sniper -t {scan_data.get('target')} -m web -w {scan_data.get('workspace', 'default')}",
-            "cve_findings": [],
-            "remediation_summary": "Review all exposed services and apply patches for detected vulnerabilities."
-        }
+        raw = await _ask(prompt, f"analyze-{uuid.uuid4()}")
+        return json.loads(_clean(raw))
+    except Exception as e:
+        logger.error(f"AI analyze error: {e}")
+        return _fallback_plan(scan_data)
 
 
 async def get_mode_recommendation(target: str, context: str = "") -> dict:
-    """Get AI recommendation for best Sn1per mode."""
-    session_id = f"recommend-{uuid.uuid4()}"
-    chat = _make_chat(session_id)
+    prompt = f"""TARGET: {target}
+CONTEXT: {context or 'None'}
 
-    user_content = f"""TARGET: {target}
-CONTEXT: {context if context else 'No additional context.'}
-
-Recommend the optimal Sn1per scanning strategy. Return ONLY this JSON structure:
+Recommend optimal Sn1per strategy. Return ONLY this JSON:
 {{
-  "recommended_mode": "mode_name",
-  "recommended_options": {{"osint": true/false, "recon": true/false, "bruteforce": false, "full_port": false}},
-  "strategy_name": "Short strategy name",
-  "rationale": "Why this mode is optimal for this specific target",
-  "scan_chain": [
-    {{"step": 1, "command": "sniper -t {target} -m mode -w workspace", "purpose": "What this step discovers"}}
-  ],
-  "expected_findings": ["Expected finding 1", "Expected finding 2"],
-  "estimated_duration": "Estimated duration",
+  "recommended_mode": "mode",
+  "recommended_options": {{"osint": true, "recon": true, "bruteforce": false, "full_port": false}},
+  "strategy_name": "Name",
+  "rationale": "Why optimal for this target",
+  "scan_chain": [{{"step": 1, "command": "sniper -t {target} -m mode -w ws", "purpose": "Purpose"}}],
+  "expected_findings": ["Finding 1", "Finding 2"],
+  "estimated_duration": "X min",
   "risk_level": "PASSIVE|LOW|MEDIUM|HIGH|AGGRESSIVE"
 }}"""
-
     try:
-        response = await chat.send_message(UserMessage(text=user_content))
-        content = response.strip()
-        if content.startswith("```"):
-            lines = content.split("\n")
-            content = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-
-        return json.loads(content)
+        raw = await _ask(prompt, f"recommend-{uuid.uuid4()}")
+        return json.loads(_clean(raw))
     except Exception:
-        return {
-            "recommended_mode": "normal",
-            "recommended_options": {"osint": True, "recon": True, "bruteforce": False, "full_port": False},
-            "strategy_name": "Standard Comprehensive Recon",
-            "rationale": f"Default comprehensive scan for {target}. Covers DNS, port scan, service detection, and per-service Metasploit testing.",
-            "scan_chain": [
-                {"step": 1, "command": f"sniper -t {target} -m normal -o -re -w workspace", "purpose": "Full recon + OSINT + subdomain enumeration"},
-                {"step": 2, "command": f"sniper -t {target} -m web -w workspace", "purpose": "Deep web application assessment"},
-            ],
-            "expected_findings": ["Open ports and running services", "DNS records and subdomains", "Web application vulnerabilities", "Potential CVE matches"],
-            "estimated_duration": "30-60 minutes",
-            "risk_level": "MEDIUM"
-        }
+        return _default_recommendation(target)
 
 
 async def chat_with_ai(message: str, scan_context: str = "", history: list = []) -> str:
-    """General AI chat about security findings."""
-    session_id = f"chat-{uuid.uuid4()}"
-    chat = _make_chat(session_id)
-
     if scan_context:
-        message = f"SCAN CONTEXT (use this for analysis):\n{scan_context[:5000]}\n\nQUESTION: {message}"
-
+        message = f"SCAN CONTEXT:\n{scan_context[:5000]}\n\nQUESTION: {message}"
     try:
-        response = await chat.send_message(UserMessage(text=message))
-        return response
+        return await _ask(message, f"chat-{uuid.uuid4()}")
     except Exception as e:
         return f"AI error: {str(e)}"
+
+
+def _fallback_plan(scan_data: dict) -> dict:
+    t = scan_data.get("target", "target")
+    w = scan_data.get("workspace", "default")
+    return {
+        "executive_summary": f"Scan completed for {t}. Configure AI_API_KEY in backend/.env to enable AI analysis.",
+        "risk_level": "HIGH",
+        "target_profile": f"Target: {t}",
+        "key_findings": ["Scan data collected — configure AI key for full analysis"],
+        "attack_phases": [{
+            "phase_number": 1, "phase_name": "Web Deep Scan",
+            "priority": "HIGH",
+            "rationale": "Standard follow-up for web assets found",
+            "findings": ["Open web port"],
+            "commands": [f"sniper -t {t} -m web -w {w}", f"sniper -t {t} -m webscan -w {w}"],
+            "expected_outcome": "Full web vulnerability assessment"
+        }],
+        "immediate_next_command": f"sniper -t {t} -m web -w {w}",
+        "cve_findings": [],
+        "remediation_summary": "Patch exposed services and rotate any leaked credentials."
+    }
+
+
+def _default_recommendation(target: str) -> dict:
+    return {
+        "recommended_mode": "normal",
+        "recommended_options": {"osint": True, "recon": True, "bruteforce": False, "full_port": False},
+        "strategy_name": "Standard Comprehensive Recon",
+        "rationale": f"DNS enum + port scan + per-service nmap/MSF for {target}",
+        "scan_chain": [
+            {"step": 1, "command": f"sniper -t {target} -m normal -o -re -w workspace", "purpose": "Full recon + OSINT"},
+            {"step": 2, "command": f"sniper -t {target} -m web -w workspace", "purpose": "Web app assessment"},
+        ],
+        "expected_findings": ["Open ports and services", "DNS subdomains", "Web vulnerabilities"],
+        "estimated_duration": "30-60 min",
+        "risk_level": "MEDIUM"
+    }

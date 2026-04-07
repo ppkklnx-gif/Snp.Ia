@@ -76,3 +76,20 @@ normal, stealth, web, webscan, fullportonly, vulnscan, nuke, discover, airstrike
 - Historical comparison between scans on same target
 - Integration with Metasploit console for direct exploit execution
 - Shodan/Censys API integration for passive recon before active scan
+
+## Actualizacion 2026-02-15 — Compatibilidad Kali + AI flexible
+
+### Cambios
+- requirements.txt reducido a 7 paquetes esenciales (antes 125 lineas de pip freeze)
+- ai_engine.py: deteccion automatica de emergentintegrations vs openai SDK estandar
+- .env: usa AI_API_KEY + AI_MODEL + AI_BASE_URL (configurable para cualquier proveedor)
+- install.sh: instalador completo para Kali con venv
+- start.sh: script de arranque con venv + backend + frontend
+- README.md: guia rapida de instalacion
+
+### Uso en Kali
+```bash
+bash install.sh   # instala todo en venv
+nano backend/.env  # configura AI_API_KEY
+bash start.sh     # arranca SniperAI
+```
