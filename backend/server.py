@@ -240,7 +240,7 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
         await db.scans.update_one({"id": scan_id}, {"$set": {"status": "failed", "error": str(e)}})
 
 
-async def run_demo_scan(scan_id: str, target: str):
+async def run_demo_scan(scan_id: str, target: str, workspace: str = "demo"):
     log_file = f"{LOG_DIR}/{scan_id}.log"
 
     await db.scans.update_one(
@@ -273,7 +273,7 @@ async def run_demo_scan(scan_id: str, target: str):
     for f in demo_findings:
         f["id"] = str(uuid.uuid4())
         f["scan_id"] = scan_id
-        f["workspace"] = "demo"
+        f["workspace"] = workspace
         f["created_at"] = datetime.now(timezone.utc).isoformat()
         await db.findings.insert_one(f)
 
@@ -331,7 +331,7 @@ async def create_scan(scan_in: ScanCreate, background_tasks: BackgroundTasks):
     if is_sniper_available():
         background_tasks.add_task(run_real_scan, scan_id, scan_doc)
     else:
-        background_tasks.add_task(run_demo_scan, scan_id, scan_in.target)
+        background_tasks.add_task(run_demo_scan, scan_id, scan_in.target, workspace)
 
     scan_doc.pop("_id", None)
     return scan_doc
