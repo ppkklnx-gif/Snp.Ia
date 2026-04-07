@@ -46,8 +46,9 @@ class ScanCreate(BaseModel):
     mode: str = "normal"
     workspace: str = ""
     options: Dict[str, bool] = {}
-    lhost: str = "0.0.0.0"   # IP local para payloads reversos de Metasploit
-    lport: int = 4444          # Puerto local para listener
+    lhost: str = "0.0.0.0"
+    lport: int = 4444
+    context: str = ""  # ej: "CTF", "banco", "red universitaria" — ayuda a la IA a priorizar
 
 
 class ChatMessage(BaseModel):
@@ -319,6 +320,17 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
             for f in findings:
                 await insert_finding(scan_id, workspace, target, f)
 
+        # Auto-análisis IA al terminar
+        if status == "completed":
+            loot_parts = []
+            if os.path.exists(log_file):
+                with open(log_file, "r", errors="replace") as f:
+                    loot_parts.append(f.read()[:30000])
+            loot_summary = collect_loot_summary(workspace, target)
+            if loot_summary != "No loot files found yet.":
+                loot_parts.append(loot_summary)
+            asyncio.create_task(do_ai_analysis(scan_id, scan_doc, "\n".join(loot_parts)))
+
     except FileNotFoundError:
         # stdbuf no disponible, intentar sin él
         with open(log_file, "a") as lf:
@@ -381,6 +393,14 @@ async def run_demo_scan(scan_id: str, target: str, workspace: str):
     await db2.execute("UPDATE scans SET status='completed', completed_at=? WHERE id=?", (now_iso(), scan_id))
     await db2.commit()
     await db2.close()
+
+    # Auto-análisis IA al terminar sin necesidad de clic manual
+    loot_data = ""
+    if os.path.exists(log_file):
+        with open(log_file, "r", errors="replace") as f:
+            loot_data = f.read()
+    scan_doc = {"target": target, "mode": "demo", "workspace": workspace, "demo": True}
+    asyncio.create_task(do_ai_analysis(scan_id, scan_doc, loot_data))
 
 
 async def do_ai_analysis(scan_id: str, scan: dict, loot_data: str):

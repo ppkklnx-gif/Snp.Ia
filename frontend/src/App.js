@@ -15,10 +15,10 @@ import {
 export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const NAV_ITEMS = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/scan/new", icon: PlusCircle, label: "New Scan" },
-  { path: "/workspaces", icon: FolderOpen, label: "Workspaces" },
-  { path: "/findings", icon: ShieldAlert, label: "All Findings" },
+  { path: "/", icon: LayoutDashboard, label: "Panel Principal" },
+  { path: "/scan/new", icon: PlusCircle, label: "Nuevo Escaneo" },
+  { path: "/workspaces", icon: FolderOpen, label: "Campañas" },
+  { path: "/findings", icon: ShieldAlert, label: "Hallazgos" },
 ];
 
 // ── Monitor global de scans activos ──
@@ -47,8 +47,8 @@ function useGlobalScanMonitor() {
               notifiedRef.current.add(s.id);
               // Notificación del navegador
               if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("SniperAI — Scan Completado", {
-                  body: `${s.target} [${s.mode?.toUpperCase()}] — ${s.status === "completed" ? "Listo para analizar con IA" : "Finalizado con error"}`,
+                new Notification("SniperAI — Escaneo Completado", {
+                  body: `${s.target} [${s.mode?.toUpperCase()}] — ${s.status === "completed" ? "Plan de ataque listo" : "Finalizado con error"}`,
                   icon: "/favicon.ico",
                   tag: s.id,
                 });
@@ -119,7 +119,7 @@ function Sidebar({ stats, activeScans }) {
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, background: "rgba(0,255,65,0.08)", border: "1px solid rgba(0,255,65,0.3)", padding: "4px 8px" }}>
             <Activity size={11} color="#00FF41" style={{ animation: "spin 2s linear infinite" }} />
             <span style={{ color: "#00FF41", fontFamily: "JetBrains Mono" }}>
-              {activeScans.length} SCAN{activeScans.length > 1 ? "S" : ""} ACTIVO{activeScans.length > 1 ? "S" : ""}
+              {activeScans.length} ESCANE{activeScans.length > 1 ? "OS" : "O"} ACTIVO{activeScans.length > 1 ? "S" : ""}
             </span>
           </div>
         )}

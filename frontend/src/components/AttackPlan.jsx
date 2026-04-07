@@ -125,25 +125,25 @@ export default function AttackPlan() {
       {/* Header */}
       <div style={{ borderBottom: "1px solid #1A2235", paddingBottom: 16, marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 10, color: "#00FF41", fontFamily: "JetBrains Mono", letterSpacing: "0.2em", marginBottom: 4 }}>KIMI AI ANALYSIS</div>
+          <div style={{ fontSize: 10, color: "#00FF41", fontFamily: "JetBrains Mono", letterSpacing: "0.2em", marginBottom: 4 }}>ANÁLISIS KIMI AI</div>
           <h1 style={{ fontFamily: "JetBrains Mono", fontSize: 22, fontWeight: 800, color: "#E2E8F0" }}>
-            Attack Execution Plan
+            Plan de Ejecución de Ataque
             {scan && <span style={{ fontSize: 14, color: "#94A3B8", fontWeight: 400 }}> — {scan.target}</span>}
           </h1>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-secondary" data-testid="back-to-scan-btn" onClick={() => navigate(`/scan/${id}`)}>
-            <ChevronRight size={12} style={{ transform: "rotate(180deg)" }} /> BACK TO SCAN
+            <ChevronRight size={12} style={{ transform: "rotate(180deg)" }} /> Volver al Terminal
           </button>
           <button
             data-testid="chain-attack-btn"
             onClick={() => setShowChain(v => !v)}
             style={{ background: showChain ? "rgba(255,176,32,0.1)" : "transparent", border: "1px solid rgba(255,176,32,0.4)", color: "#FFB020", cursor: "pointer", padding: "7px 14px", fontSize: 11, fontFamily: "JetBrains Mono", display: "flex", alignItems: "center", gap: 6 }}>
-            <Activity size={12} /> {showChain ? "OCULTAR CHAIN" : "CHAIN ATTACK"}
+            <Activity size={12} /> {showChain ? "OCULTAR CADENA" : "ATAQUE EN CADENA"}
           </button>
           <button className="btn-primary" data-testid="reanalyze-btn" onClick={triggerAnalysis} disabled={analyzing}>
             {analyzing ? <Loader size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Zap size={12} />}
-            {analyzing ? "ANALYZING..." : "RE-ANALYZE"}
+            {analyzing ? "Analizando..." : "Re-Analizar"}
           </button>
         </div>
       </div>
@@ -163,16 +163,16 @@ export default function AttackPlan() {
               <div className="ai-thinking" style={{ display: "inline-block", padding: "24px 32px", marginBottom: 16 }}>
                 <Loader size={32} color="#00FF41" style={{ animation: "spin 1s linear infinite", margin: "0 auto" }} />
               </div>
-              <div style={{ fontSize: 14, color: "#00FF41", fontFamily: "JetBrains Mono" }}>Kimi AI is generating your attack plan...</div>
+              <div style={{ fontSize: 14, color: "#00FF41", fontFamily: "JetBrains Mono" }}>Kimi AI generando tu plan de ataque...</div>
             </>
           ) : (
             <>
               <Zap size={40} color="#1A2235" style={{ margin: "0 auto 16px" }} />
               <div style={{ fontSize: 14, color: "#94A3B8", fontFamily: "JetBrains Mono", marginBottom: 16 }}>
-                No attack plan generated yet.
+                Plan de ataque no generado aún.
               </div>
               <button className="btn-primary" data-testid="generate-plan-btn" onClick={triggerAnalysis}>
-                <Zap size={13} /> GENERATE ATTACK PLAN
+                <Zap size={13} /> GENERAR PLAN DE ATAQUE
               </button>
             </>
           )}
@@ -282,7 +282,8 @@ export default function AttackPlan() {
           {/* Remediation */}
           {plan.remediation_summary && (
             <div style={{ background: "rgba(66,153,225,0.06)", border: "1px solid rgba(66,153,225,0.2)", padding: 16 }}>
-              <div className="section-label" style={{ color: "#4299E1", marginBottom: 8 }}>DEFENDER REMEDIATION</div>
+              <div className="section-label" style={{ color: "#4299E1", marginBottom: 8 }}>RECOMENDACIONES DE REMEDIACIÓN</div>
+              {/* label reemplazado */}
               <p style={{ fontSize: 12, color: "#94A3B8", lineHeight: 1.6 }}>{plan.remediation_summary}</p>
             </div>
           )}
