@@ -279,10 +279,12 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
         lf.write(f"{'='*70}\n\n")
 
     try:
-        # stdbuf -oL fuerza output line-buffered (evita que sniper bufferee)
-        # TERM=xterm necesario para que sniper produzca output con colores/formato
-        full_cmd = ["stdbuf", "-oL"] + cmd
-        env = {**os.environ, "TERM": "xterm", "DEBIAN_FRONTEND": "noninteractive"}
+        import shlex
+        # Usar 'script' para crear un pseudo-TTY
+        # Esto hace que sniper crea que está en un terminal real → output inmediato sin buffering
+        cmd_str = " ".join(shlex.quote(c) for c in cmd)
+        full_cmd = ["script", "-q", "-c", cmd_str, "/dev/null"]
+        env = {**os.environ, "TERM": "xterm-256color", "DEBIAN_FRONTEND": "noninteractive"}
 
         with open(log_file, "a") as lf:
             process = await asyncio.create_subprocess_exec(
@@ -298,6 +300,8 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
 
             async for line in process.stdout:
                 decoded = line.decode("utf-8", errors="replace")
+                # Limpiar caracteres de control del PTY
+                decoded = decoded.replace("\r\n", "\n").replace("\r", "\n")
                 lf.write(decoded)
                 lf.flush()
 
@@ -307,7 +311,8 @@ async def run_real_scan(scan_id: str, scan_doc: dict):
             lf.write(f"[*] Proceso terminado con código: {rc}\n")
             lf.write(f"[*] Fin: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
-        status = "completed" if rc == 0 else "failed"
+        # rc -9 = detenido (SIGKILL), 0 = OK, otro = error
+        status = "completed" if rc in (0, None) else ("stopped" if rc == -9 else "failed")
         db3 = await get_db()
         await db3.execute("UPDATE scans SET status=?, completed_at=? WHERE id=?", (status, now_iso(), scan_id))
         await db3.commit()
